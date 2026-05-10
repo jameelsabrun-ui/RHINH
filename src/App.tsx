@@ -12,6 +12,7 @@ import CalculatorPage from './pages/CalculatorPage';
 import LegalityPage from './pages/LegalityPage';
 import React from 'react';
 import { supabase } from './lib/supabase';
+import SyariahChatbot from './components/SyariahChatbot';
 
 function ScrollToTop() {
   const { pathname } = useLocation();
@@ -63,6 +64,7 @@ export default function App() {
         </main>
 
         <Footer />
+        <SyariahChatbot />
       </div>
     </Router>
   );
