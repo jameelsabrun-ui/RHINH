@@ -1,7 +1,6 @@
 import React from 'react';
 import { Play, Quote, User, Sparkles, Loader2, Video, Image as ImageIcon } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
-import { GoogleGenAI } from "@google/genai";
 import { cn } from '../lib/utils';
 
 interface Testimonial {
@@ -86,40 +85,30 @@ export default function VideoTestimonials() {
   const handleGenerateImage = async (testimonial: Testimonial) => {
     try {
       setErrorStatus(prev => ({ ...prev, [testimonial.id]: '' }));
-      
-      // 1. Check/Select API Key
-      // @ts-ignore - window.aistudio is injected environment
-      if (!(await window.aistudio.hasSelectedApiKey())) {
-        // @ts-ignore
-        await window.aistudio.openSelectKey();
-        return; // Stop if key selection was prompted
-      }
 
       setImageGeneratingStatus(prev => ({ ...prev, [testimonial.id]: 'Initializing...' }));
 
-      // 2. Initialize Gemini API
-      const apiKey = process.env.GEMINI_API_KEY || process.env.API_KEY; 
-      if (!apiKey) {
-        throw new Error('Kunci API diperlukan. Silakan pilih kunci API di menu Pengaturan.');
-      }
-      
-      const ai = new GoogleGenAI({ apiKey });
-
       setImageGeneratingStatus(prev => ({ ...prev, [testimonial.id]: 'Generating Image...' }));
 
-      // 3. Generate Image using Imagen
-      const response = await ai.models.generateImages({
-        model: 'imagen-4.0-generate-001',
-        prompt: `A beautiful, high-quality cinematic architectural photograph capturing the essence of this testimonial: "${testimonial.quote}". 
+      // 3. Generate Image using Netlify Function
+      const response = await fetch('/api/generate-image', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          prompt: `A beautiful, high-quality cinematic architectural photograph capturing the essence of this testimonial: "${testimonial.quote}". 
                 The scene should show a peaceful, modern sharia-compliant residential home area in Indonesia with warm, golden hour sunlight, lush greenery, and a sense of family happiness and spiritual peace. 
-                Professional photography, 8k, highly detailed.`,
-        config: {
-          numberOfImages: 1,
-          aspectRatio: '16:9'
-        }
+                Professional photography, 8k, highly detailed.`
+        })
       });
 
-      const base64Data = response.generatedImages?.[0]?.image?.imageBytes;
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.error || 'Gagal menghasilkan gambar');
+      }
+
+      const data = await response.json();
+      const base64Data = data.base64Data;
+      
       if (!base64Data) throw new Error('Format gambar tidak valid dari AI.');
 
       const imageUrl = `data:image/png;base64,${base64Data}`;
@@ -140,84 +129,80 @@ export default function VideoTestimonials() {
   const handleGenerateVideo = async (testimonial: Testimonial) => {
     try {
       setErrorStatus(prev => ({ ...prev, [testimonial.id]: '' }));
-      
-      // 1. Check/Select API Key
-      // @ts-ignore - window.aistudio is injected environment
-      if (!(await window.aistudio.hasSelectedApiKey())) {
-        // @ts-ignore
-        await window.aistudio.openSelectKey();
-        return;
-      }
 
       setGeneratingStatus(prev => ({ ...prev, [testimonial.id]: 'Initializing...' }));
 
-      // 2. Initialize Gemini API
-      const apiKey = process.env.GEMINI_API_KEY || process.env.API_KEY; 
-      if (!apiKey) {
-        throw new Error('Kunci API diperlukan untuk fitur ini. Silakan gunakan kunci API berbayar.');
-      }
-      
-      const ai = new GoogleGenAI({ apiKey });
-
       setGeneratingStatus(prev => ({ ...prev, [testimonial.id]: 'Generating Video...' }));
 
-      // 3. Generate Video
-      let operation = await ai.models.generateVideos({
-        model: 'veo-3.1-lite-generate-preview',
-        prompt: `High-quality cinematic testimonial video for a sharia housing project. 
+      // 3. Generate Video using Netlify Function
+      const startResponse = await fetch('/api/generate-video', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'start',
+          prompt: `High-quality cinematic testimonial video for a sharia housing project. 
                 Visual theme: Professional stock-footage style showing a happy family in a bright, modern, peaceful home. 
                 Text overlay: "${testimonial.name}"
                 Icon overlay: A house with a heart.
                 Mood: Peaceful, blessed, and prosperous. 
-                Represent this quote visually: "${testimonial.quote}"`,
-        config: {
-          numberOfVideos: 1,
-          resolution: '720p',
-          aspectRatio: '16:9'
-        }
+                Represent this quote visually: "${testimonial.quote}"`
+        })
       });
+
+      if (!startResponse.ok) {
+        const errorData = await startResponse.json().catch(() => ({}));
+        throw new Error(errorData.error || 'Gagal memulai pembuatan video');
+      }
+
+      const startData = await startResponse.json();
+      let operation = startData.operation;
 
       // 4. Poll for completion
       while (!operation.done) {
         setGeneratingStatus(prev => ({ ...prev, [testimonial.id]: 'Processing (may take 2-3 mins)...' }));
         await new Promise(resolve => setTimeout(resolve, 10000));
-        operation = await ai.operations.getVideosOperation({ operation: operation });
+        
+        const statusResponse = await fetch('/api/generate-video', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            action: 'status',
+            operationName: operation.name
+          })
+        });
+
+        if (!statusResponse.ok) {
+           throw new Error('Gagal memeriksa status video');
+        }
+
+        const statusData = await statusResponse.json();
+        operation = statusData.operation;
         
         if (operation.error) {
            throw new Error((operation.error.message as string) || 'Video generation failed');
         }
+        
+        if (operation.done && statusData.downloadLink) {
+           const downloadLink = statusData.downloadLink;
+           setGeneratingStatus(prev => ({ ...prev, [testimonial.id]: 'Finalizing...' }));
+
+           // 5. Fetch the video using the proxy endpoint
+           const proxyResponse = await fetch(`/api/download-video?url=${encodeURIComponent(downloadLink)}`);
+           if (!proxyResponse.ok) throw new Error('Gagal mengunduh video yang dihasilkan.');
+
+           const blob = await proxyResponse.blob();
+           const videoUrl = URL.createObjectURL(blob);
+
+           setGeneratedVideos(prev => ({ ...prev, [testimonial.id]: videoUrl }));
+           setGeneratingStatus(prev => ({ ...prev, [testimonial.id]: '' }));
+           return;
+        }
       }
-
-      const downloadLink = operation.response?.generatedVideos?.[0]?.video?.uri;
-      if (!downloadLink) throw new Error('Gagal mendapatkan link download video.');
-
-      setGeneratingStatus(prev => ({ ...prev, [testimonial.id]: 'Finalizing...' }));
-
-      // 5. Fetch the video using the API key
-      const response = await fetch(downloadLink, {
-        method: 'GET',
-        headers: {
-          'x-goog-api-key': apiKey,
-        },
-      });
-
-      if (!response.ok) throw new Error('Gagal mengunduh video yang dihasilkan.');
-
-      const blob = await response.blob();
-      const videoUrl = URL.createObjectURL(blob);
-
-      setGeneratedVideos(prev => ({ ...prev, [testimonial.id]: videoUrl }));
-      setGeneratingStatus(prev => ({ ...prev, [testimonial.id]: '' }));
 
     } catch (error: any) {
       console.error('Video Generation Error:', error);
       setGeneratingStatus(prev => ({ ...prev, [testimonial.id]: '' }));
       setErrorStatus(prev => ({ ...prev, [testimonial.id]: getFriendlyErrorMessage(error) }));
-      
-      if (error.message?.includes('Requested entity was not found')) {
-        // @ts-ignore
-        await window.aistudio.openSelectKey();
-      }
     }
   };
 
