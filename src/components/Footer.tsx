@@ -103,16 +103,6 @@ export default function Footer() {
         </div>
       </div>
 
-      {/* Floating WhatsApp Button */}
-      <a
-        href="https://wa.me/6281234567890?text=Halo%20Bapak%20Nur%20Holis%2C%20saya%20ingin%20konsultasi%20mengenai%20properti%20syariah%20dari%20Floating%20Button."
-        target="_blank"
-        rel="noopener noreferrer"
-        className="fixed bottom-8 right-8 z-[100] bg-emerald-600 text-white p-4 rounded-full shadow-2xl hover:bg-emerald-500 transition-all hover:scale-110 flex items-center gap-3 animate-bounce"
-      >
-        <MessageSquare size={24} />
-        <span className="hidden md:inline font-bold">Butuh Bantuan?</span>
-      </a>
     </footer>
   );
 }
