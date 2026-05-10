@@ -56,19 +56,11 @@ export default function ContactUs() {
     setIsSubmitting(true);
     
     try {
-      // Use Formspree for handling form submissions
-      // Instructions: Create a form at https://formspree.io/ and put the Form ID in .env
-      const formspreeId = import.meta.env.VITE_FORMSPREE_ID || 'xpznayye'; // Fallback to a demo ID if not set
-      const response = await fetch(`https://formspree.io/f/${formspreeId}`, {
+      const formDataObj = new FormData(e.target as HTMLFormElement);
+      const response = await fetch('/__forms.html', {
         method: 'POST',
-        headers: {
-          'Accept': 'application/json',
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          ...formData,
-          _subject: `Pesan Baru dari ${formData.name}: ${formData.subject}`,
-        }),
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: new URLSearchParams(formDataObj as any).toString(),
       });
 
       if (!response.ok) {
@@ -132,11 +124,23 @@ export default function ContactUs() {
               {!isSuccess ? (
                 <motion.form
                   key="form"
+                  name="contact"
+                  method="POST"
+                  data-netlify="true"
+                  netlify-honeypot="bot-field"
                   initial={{ opacity: 1 }}
                   exit={{ opacity: 0, y: -20 }}
                   onSubmit={handleSubmit}
                   className="space-y-6"
                 >
+                    {/* Hidden fields for Netlify Forms */}
+                    <input type="hidden" name="form-name" value="contact" />
+                    <p style={{ display: 'none' }}>
+                      <label>
+                        Don't fill this out: <input name="bot-field" />
+                      </label>
+                    </p>
+
                     <div className="space-y-2">
                        <label className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-widest flex items-center gap-2">
                          <User size={14} className="text-emerald-500" />
