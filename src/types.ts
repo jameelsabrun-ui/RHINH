@@ -19,6 +19,10 @@ export interface Property {
   status: 'available' | 'reserved' | 'sold';
   progress: number;
   features: string[];
+  coordinates?: {
+    lat: number;
+    lng: number;
+  };
 }
 
 export interface ConstructionLog {

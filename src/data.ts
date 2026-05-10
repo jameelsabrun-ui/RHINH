@@ -16,7 +16,8 @@ export const PROPERTIES: Property[] = [
     description: "Hunian asri dengan lingkungan islami, masjid dalam kawasan, dan keamanan 24 jam.",
     status: "available",
     progress: 75,
-    features: ["Masjid", "CCTV 24/7", "Area Panahan", "Taman Bermain"]
+    features: ["Masjid", "CCTV 24/7", "Area Panahan", "Taman Bermain"],
+    coordinates: { lat: -6.1416, lng: 106.8770 }
   },
   {
     id: "p2",
@@ -32,7 +33,8 @@ export const PROPERTIES: Property[] = [
     description: "Proyek strategis dekat kawasan industri dengan skema cicilan syariah flat 10 tahun.",
     status: "available",
     progress: 30,
-    features: ["Dekat Stasiun", "Bebas Banjir", "Skema Murabahah"]
+    features: ["Dekat Stasiun", "Bebas Banjir", "Skema Murabahah"],
+    coordinates: { lat: -6.2709, lng: 107.1706 }
   },
   {
     id: "p3",
@@ -48,7 +50,8 @@ export const PROPERTIES: Property[] = [
     description: "Hunian tenang dengan udara sejuk pegunungan, legalitas SHM sudah pecah.",
     status: "reserved",
     progress: 90,
-    features: ["Udara Sejuk", "SHM Ready", "Kajian Rutin"]
+    features: ["Udara Sejuk", "SHM Ready", "Kajian Rutin"],
+    coordinates: { lat: -6.5971, lng: 106.7949 }
   },
   {
     id: "p4",
@@ -64,7 +67,8 @@ export const PROPERTIES: Property[] = [
     description: "Villa keluarga dengan konsep desain modern kontemporer dan pemandangan lembah yang menakjubkan.",
     status: "available",
     progress: 15,
-    features: ["Private Garden", "View Lembah", "Smart Home System"]
+    features: ["Private Garden", "View Lembah", "Smart Home System"],
+    coordinates: { lat: -6.8248, lng: 107.6186 }
   },
   {
     id: "p5",
@@ -80,7 +84,8 @@ export const PROPERTIES: Property[] = [
     description: "Solusi hunian terjangkau untuk milenial muslim dengan efisiensi ruang yang maksimal.",
     status: "sold",
     progress: 100,
-    features: ["Full Furnished", "Dekat Kampus", "Security RFID"]
+    features: ["Full Furnished", "Dekat Kampus", "Security RFID"],
+    coordinates: { lat: -6.4025, lng: 106.7942 }
   }
 ];
 
@@ -100,5 +105,29 @@ export const CONSTRUCTION_LOGS: ConstructionLog[] = [
     description: "Pengecoran Lantai 2",
     imageUrl: "https://images.unsplash.com/photo-1541888946425-d81bb19480c5?q=80&w=800&auto=format&fit=crop",
     percentage: 60
+  },
+  {
+    id: "l3",
+    projectId: "p1",
+    date: "2026-03-20",
+    description: "Pekerjaan Dinding Lantai 1 Selesai",
+    imageUrl: "https://images.unsplash.com/photo-1581094794329-c8112a89af12?q=80&w=800&auto=format&fit=crop",
+    percentage: 45
+  },
+  {
+    id: "l4",
+    projectId: "p1",
+    date: "2026-02-10",
+    description: "Pondasi Cakar Ayam dan Sloof Gantung",
+    imageUrl: "https://images.unsplash.com/photo-1590001158193-7903d2e5eec6?q=80&w=800&auto=format&fit=crop",
+    percentage: 20
+  },
+  {
+    id: "l5",
+    projectId: "p1",
+    date: "2026-01-05",
+    description: "Land Clearing & Pematangan Lahan Kawasan",
+    imageUrl: "https://images.unsplash.com/photo-1531834685032-c34bf0d84c77?q=80&w=800&auto=format&fit=crop",
+    percentage: 5
   }
 ];

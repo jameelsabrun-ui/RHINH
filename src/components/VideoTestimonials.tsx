@@ -37,14 +37,62 @@ export default function VideoTestimonials() {
   const [generatingStatus, setGeneratingStatus] = React.useState<Record<string, string>>({});
   const [generatedImages, setGeneratedImages] = React.useState<Record<string, string>>({});
   const [imageGeneratingStatus, setImageGeneratingStatus] = React.useState<Record<string, string>>({});
+  const [errorStatus, setErrorStatus] = React.useState<Record<string, string>>({});
+
+  // Caching Logic
+  const CACHE_KEYS = {
+    IMAGES: 'nurholis_ai_images_cache',
+    // Note: Video blobs are not persistent in localStorage, but we could cache links if they were permanent.
+    // For now, we prioritize images as requested.
+  };
+
+  // Load cache on mount
+  React.useEffect(() => {
+    try {
+      const cachedImages = localStorage.getItem(CACHE_KEYS.IMAGES);
+      if (cachedImages) {
+        setGeneratedImages(JSON.parse(cachedImages));
+      }
+    } catch (e) {
+      console.error('Failed to load AI cache', e);
+    }
+  }, []);
+
+  // Update cache when generatedImages changes
+  React.useEffect(() => {
+    if (Object.keys(generatedImages).length > 0) {
+      try {
+        localStorage.setItem(CACHE_KEYS.IMAGES, JSON.stringify(generatedImages));
+      } catch (e) {
+        console.warn('LocalStorage limit reached, could not cache all images', e);
+      }
+    }
+  }, [generatedImages]);
+
+  const getFriendlyErrorMessage = (error: any) => {
+    const message = error.message || String(error);
+    if (message.toLowerCase().includes('quota') || message.includes('429')) {
+      return 'Mohon maaf, kuota penggunaan AI sedang habis. Silakan coba lagi beberapa saat lagi atau gunakan kunci API yang berbeda.';
+    }
+    if (message.includes('403') || message.toLowerCase().includes('permission') || message.includes('API key')) {
+      return 'Kunci API tidak valid atau tidak memiliki akses. Pastikan Anda telah memilih kunci API yang benar.';
+    }
+    if (message.includes('not found')) {
+      return 'Layanan AI tidak ditemukan. Mohon pastikan kunci API Anda mendukung model ini.';
+    }
+    return `Terjadi kesalahan: ${message}`;
+  };
 
   const handleGenerateImage = async (testimonial: Testimonial) => {
     try {
+      setErrorStatus(prev => ({ ...prev, [testimonial.id]: '' }));
+      
       // 1. Check/Select API Key
       // @ts-ignore - window.aistudio is injected environment
       if (!(await window.aistudio.hasSelectedApiKey())) {
         // @ts-ignore
         await window.aistudio.openSelectKey();
+        return; // Stop if key selection was prompted
       }
 
       setImageGeneratingStatus(prev => ({ ...prev, [testimonial.id]: 'Initializing...' }));
@@ -52,7 +100,7 @@ export default function VideoTestimonials() {
       // 2. Initialize Gemini API
       const apiKey = process.env.GEMINI_API_KEY || process.env.API_KEY; 
       if (!apiKey) {
-        throw new Error('API Key is required for image generation.');
+        throw new Error('Kunci API diperlukan. Silakan pilih kunci API di menu Pengaturan.');
       }
       
       const ai = new GoogleGenAI({ apiKey });
@@ -72,35 +120,41 @@ export default function VideoTestimonials() {
       });
 
       const base64Data = response.generatedImages?.[0]?.image?.imageBytes;
-      if (!base64Data) throw new Error('No image data returned');
+      if (!base64Data) throw new Error('Format gambar tidak valid dari AI.');
 
       const imageUrl = `data:image/png;base64,${base64Data}`;
 
-      setGeneratedImages(prev => ({ ...prev, [testimonial.id]: imageUrl }));
+      setGeneratedImages(prev => {
+        const next = { ...prev, [testimonial.id]: imageUrl };
+        return next;
+      });
       setImageGeneratingStatus(prev => ({ ...prev, [testimonial.id]: '' }));
 
     } catch (error: any) {
       console.error('Image Generation Error:', error);
       setImageGeneratingStatus(prev => ({ ...prev, [testimonial.id]: '' }));
-      alert(`Gagal membuat gambar: ${error.message || 'Terjadi kesalahan sistem'}`);
+      setErrorStatus(prev => ({ ...prev, [testimonial.id]: getFriendlyErrorMessage(error) }));
     }
   };
 
   const handleGenerateVideo = async (testimonial: Testimonial) => {
     try {
+      setErrorStatus(prev => ({ ...prev, [testimonial.id]: '' }));
+      
       // 1. Check/Select API Key
       // @ts-ignore - window.aistudio is injected environment
       if (!(await window.aistudio.hasSelectedApiKey())) {
         // @ts-ignore
         await window.aistudio.openSelectKey();
+        return;
       }
 
       setGeneratingStatus(prev => ({ ...prev, [testimonial.id]: 'Initializing...' }));
 
-      // 2. Initialize Gemini API (Always new instance per core requirement)
+      // 2. Initialize Gemini API
       const apiKey = process.env.GEMINI_API_KEY || process.env.API_KEY; 
       if (!apiKey) {
-        throw new Error('API Key is required for video generation. Please select a paid key.');
+        throw new Error('Kunci API diperlukan untuk fitur ini. Silakan gunakan kunci API berbayar.');
       }
       
       const ai = new GoogleGenAI({ apiKey });
@@ -129,14 +183,13 @@ export default function VideoTestimonials() {
         await new Promise(resolve => setTimeout(resolve, 10000));
         operation = await ai.operations.getVideosOperation({ operation: operation });
         
-        // Handle potential failure in status
         if (operation.error) {
            throw new Error((operation.error.message as string) || 'Video generation failed');
         }
       }
 
       const downloadLink = operation.response?.generatedVideos?.[0]?.video?.uri;
-      if (!downloadLink) throw new Error('No video URI returned');
+      if (!downloadLink) throw new Error('Gagal mendapatkan link download video.');
 
       setGeneratingStatus(prev => ({ ...prev, [testimonial.id]: 'Finalizing...' }));
 
@@ -148,7 +201,7 @@ export default function VideoTestimonials() {
         },
       });
 
-      if (!response.ok) throw new Error('Failed to download generated video');
+      if (!response.ok) throw new Error('Gagal mengunduh video yang dihasilkan.');
 
       const blob = await response.blob();
       const videoUrl = URL.createObjectURL(blob);
@@ -159,9 +212,8 @@ export default function VideoTestimonials() {
     } catch (error: any) {
       console.error('Video Generation Error:', error);
       setGeneratingStatus(prev => ({ ...prev, [testimonial.id]: '' }));
-      alert(`Gagal membuat video: ${error.message || 'Terjadi kesalahan sistem'}`);
+      setErrorStatus(prev => ({ ...prev, [testimonial.id]: getFriendlyErrorMessage(error) }));
       
-      // Handle the "Requested entity was not found" error by prompting for key again
       if (error.message?.includes('Requested entity was not found')) {
         // @ts-ignore
         await window.aistudio.openSelectKey();
@@ -196,7 +248,7 @@ export default function VideoTestimonials() {
             whileInView={{ opacity: 1, y: 0 }}
             viewport={{ once: true }}
             transition={{ delay: 0.2 }}
-            className="text-slate-600 dark:text-slate-400 max-w-2xl mx-auto font-medium"
+            className="text-slate-600 dark:text-slate-300 max-w-2xl mx-auto font-medium"
           >
             Dengarkan langsung pengalaman para penghuni. Anda juga dapat menggunakan teknologi AI Veo untuk memvisualisasikan testimoni mereka.
           </motion.p>
@@ -220,6 +272,31 @@ export default function VideoTestimonials() {
                 className="group flex flex-col h-full bg-slate-50 dark:bg-slate-900 rounded-[40px] overflow-hidden border border-slate-100 dark:border-slate-800 transition-all hover:border-emerald-200 dark:hover:border-emerald-900/50 hover:shadow-2xl hover:-translate-y-2 relative"
                 id={`testimonial-${t.id}`}
               >
+                {/* Error Overlay */}
+                <AnimatePresence>
+                  {errorStatus[t.id] && (
+                    <motion.div
+                      initial={{ opacity: 0, y: 10 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      exit={{ opacity: 0, y: -10 }}
+                      className="absolute inset-0 z-50 bg-rose-950/95 flex flex-col items-center justify-center p-8 text-center"
+                    >
+                      <div className="w-12 h-12 bg-rose-500 rounded-full flex items-center justify-center mb-4 shadow-lg shadow-rose-500/30">
+                        <Quote size={24} className="text-white rotate-180" />
+                      </div>
+                      <h5 className="text-white font-bold mb-2">Ups! Terjadi Kendala AI</h5>
+                      <p className="text-rose-100 text-xs leading-relaxed mb-6 font-medium">
+                        {errorStatus[t.id]}
+                      </p>
+                      <button 
+                        onClick={() => setErrorStatus(prev => ({ ...prev, [t.id]: '' }))}
+                        className="bg-white text-rose-900 px-6 py-2 rounded-xl text-xs font-black uppercase tracking-widest hover:bg-rose-50 transition-colors"
+                      >
+                        Tutup
+                      </button>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
                 {/* Video Player Container */}
                 <div className="relative aspect-video bg-slate-900 overflow-hidden shadow-inner group/video">
                   {isGenerating ? (
@@ -252,23 +329,27 @@ export default function VideoTestimonials() {
                     <div className="absolute bottom-4 right-4 z-10 flex flex-col gap-2 items-end opacity-0 group-hover/video:opacity-100 translate-y-2 group-hover/video:translate-y-0 transition-all">
                       <button 
                         onClick={() => handleGenerateVideo(t)}
-                        className="flex items-center gap-2 bg-emerald-600 hover:bg-emerald-500 text-white px-3 py-1.5 rounded-full text-[10px] font-bold shadow-lg transition-all"
+                        aria-label={isGenerated ? 'Regenerasi Video testimoni menggunakan AI' : 'Hasilkan Video testimoni menggunakan AI'}
+                        title={isGenerated ? 'Regenerasi Video AI' : 'Hasilkan Video AI'}
+                        className="flex items-center gap-2 bg-emerald-600 hover:bg-emerald-500 text-white px-3 py-1.5 rounded-full text-[10px] font-bold shadow-lg transition-all focus:ring-2 focus:ring-white"
                       >
-                        <Video size={12} />
+                        <Video size={12} aria-hidden="true" />
                         {isGenerated ? 'Regenerate Video AI' : 'Generate Video AI'}
                       </button>
                       <button 
                         onClick={() => handleGenerateImage(t)}
                         disabled={isImageGenerating}
+                        aria-label={currentImageUrl ? 'Regenerasi visualisasi testimoni menggunakan AI' : 'Hasilkan visualisasi testimoni menggunakan AI'}
+                        title={currentImageUrl ? 'Regenerate Essence' : 'Generate Essence'}
                         className={cn(
-                          "flex items-center gap-2 px-3 py-1.5 rounded-full text-[10px] font-bold shadow-lg transition-all",
+                          "flex items-center gap-2 px-3 py-1.5 rounded-full text-[10px] font-bold shadow-lg transition-all focus:ring-2 focus:ring-white",
                           isImageGenerating ? "bg-slate-700 text-slate-400" : "bg-blue-600 hover:bg-blue-500 text-white"
                         )}
                       >
                         {isImageGenerating ? (
-                          <Loader2 size={12} className="animate-spin" />
+                          <Loader2 size={12} className="animate-spin" aria-hidden="true" />
                         ) : (
-                          <ImageIcon size={12} />
+                          <ImageIcon size={12} aria-hidden="true" />
                         )}
                         {currentImageUrl ? 'Regenerate Essence' : 'Generate Essence'}
                       </button>
@@ -313,7 +394,7 @@ export default function VideoTestimonials() {
                      </div>
                      <div>
                        <h4 className="font-bold text-slate-900 dark:text-white text-lg">{t.name}</h4>
-                       <p className="text-slate-400 dark:text-slate-500 text-[10px] font-bold uppercase tracking-widest">Penghuni Rumah Halal</p>
+                       <p className="text-slate-400 dark:text-slate-400 text-[10px] font-bold uppercase tracking-widest">Penghuni Rumah Halal</p>
                      </div>
                   </div>
                 </div>

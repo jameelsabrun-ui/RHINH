@@ -6,10 +6,16 @@ import ConstructionTracking from '../components/ConstructionTracking';
 import FAQ from '../components/FAQ';
 import VideoTestimonials from '../components/VideoTestimonials';
 import ContactUs from '../components/ContactUs';
+import SEO from '../components/SEO';
+import FieldDocumentation from '../components/FieldDocumentation';
 
 export default function Home() {
   return (
     <>
+      <SEO 
+        title="Hunian Berkah Tanpa Riba"
+        description="Temukan properti syariah impian Anda bersama Nur Holis. Tanpa riba, tanpa denda, tanpa sita, dan akad yang diawasi Dewan Pengawas Syariah."
+      />
       <Hero />
 
       {/* Feature Highlights Grid */}
@@ -21,6 +27,8 @@ export default function Home() {
           <div>Tanpa Akad Bermasalah</div>
         </div>
       </div>
+
+      <FieldDocumentation />
 
       <PropertyList />
       <ShariaCalculator />

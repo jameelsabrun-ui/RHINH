@@ -39,7 +39,7 @@ export default function FAQ() {
             Frequently Asked Questions
           </div>
           <h2 className="text-3xl font-bold text-slate-900 dark:text-white mb-4">Hal yang Sering Ditanyakan</h2>
-          <p className="text-slate-600 dark:text-slate-400">
+          <p className="text-slate-600 dark:text-slate-300">
             Dapatkan jawaban cepat untuk pertanyaan umum seputar kepemilikan hunian syariah.
           </p>
         </div>
@@ -71,7 +71,7 @@ export default function FAQ() {
                     animate={{ height: 'auto', opacity: 1 }}
                     exit={{ height: 0, opacity: 0 }}
                   >
-                    <div className="px-6 pb-6 text-slate-600 dark:text-slate-400 text-sm leading-relaxed">
+                    <div className="px-6 pb-6 text-slate-600 dark:text-slate-300 text-sm leading-relaxed">
                       {faq.answer}
                     </div>
                   </motion.div>

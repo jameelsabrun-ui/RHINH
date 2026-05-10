@@ -3,10 +3,15 @@ import ShariaCalculator from '../components/ShariaCalculator';
 import { motion } from 'motion/react';
 import { ChevronRight, Home, Calculator } from 'lucide-react';
 import { Link } from 'react-router-dom';
+import SEO from '../components/SEO';
 
 export default function CalculatorPage() {
   return (
     <div className="pt-24 min-h-screen">
+      <SEO 
+        title="Kalkulator Cicilan Syariah"
+        description="Simulasikan cicilan hunian impian Anda dengan skema syariah murni. Transparan, adil, tanpa bunga, denda, dan biaya tersembunyi."
+      />
       {/* Breadcrumbs / Header */}
       <div className="bg-slate-50 dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800 py-6">
         <div className="max-w-7xl mx-auto px-6">

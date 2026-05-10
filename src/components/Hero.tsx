@@ -1,6 +1,7 @@
 import { motion, useScroll, useTransform } from 'motion/react';
 import { ShieldCheck, Calendar, Handshake, ChevronRight } from 'lucide-react';
 import React from 'react';
+import { getOptimizedImageUrl } from '../lib/utils';
 
 export default function Hero() {
   const { scrollY } = useScroll();
@@ -25,7 +26,7 @@ export default function Hero() {
         />
         <motion.img
           style={{ y: y3 }}
-          src="https://images.unsplash.com/photo-1600585154340-be6161a56a0c?q=80&w=1200&auto=format&fit=crop"
+          src={getOptimizedImageUrl("https://images.unsplash.com/photo-1600585154340-be6161a56a0c", 1200)}
           className="absolute inset-0 w-full h-full object-cover opacity-20"
           alt="Rumah Halal"
         />
@@ -84,7 +85,7 @@ export default function Hero() {
               <div key={i} className="flex flex-col gap-2">
                 <item.icon className="text-emerald-500" size={24} />
                 <div className="text-white font-semibold text-sm">{item.label}</div>
-                <div className="text-slate-400 text-xs">{item.detail}</div>
+                <div className="text-slate-300 text-xs">{item.detail}</div>
               </div>
             ))}
           </div>
@@ -99,7 +100,7 @@ export default function Hero() {
         >
           <div className="relative z-10 bg-gradient-to-br from-emerald-600 to-emerald-800 p-1 rounded-3xl overflow-hidden shadow-2xl">
               <img
-                src="https://images.unsplash.com/photo-1560518883-ce09059eeffa?q=80&w=800&auto=format&fit=crop"
+                src={getOptimizedImageUrl("https://images.unsplash.com/photo-1560518883-ce09059eeffa", 800)}
                 alt="Nur Holis Property"
                 className="rounded-[22px] w-full h-[500px] object-cover"
               />

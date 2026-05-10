@@ -3,10 +3,15 @@ import PropertyList from '../components/PropertyList';
 import { motion } from 'motion/react';
 import { ChevronRight, Home } from 'lucide-react';
 import { Link } from 'react-router-dom';
+import SEO from '../components/SEO';
 
 export default function PropertiesPage() {
   return (
     <div className="pt-24 min-h-screen">
+      <SEO 
+        title="Katalog Properti Syariah"
+        description="Jelajahi berbagai pilihan hunian islami yang nyaman dan berkah. Lokasi strategis dengan skema pembayaran murni syariah."
+      />
       {/* Breadcrumbs / Header */}
       <div className="bg-slate-50 dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800 py-6">
         <div className="max-w-7xl mx-auto px-6">

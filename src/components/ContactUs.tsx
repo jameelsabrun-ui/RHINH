@@ -6,46 +6,86 @@ import { cn } from '../lib/utils';
 export default function ContactUs() {
   const [isSubmitting, setIsSubmitting] = React.useState(false);
   const [isSuccess, setIsSuccess] = React.useState(false);
-  const [email, setEmail] = React.useState('');
-  const [emailError, setEmailError] = React.useState('');
+  const [formData, setFormData] = React.useState({
+    name: '',
+    email: '',
+    phone: '',
+    subject: '',
+    message: ''
+  });
+  const [errors, setErrors] = React.useState<Record<string, string>>({});
 
-  const validateEmail = (value: string) => {
-    const regex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (!value) {
-      setEmailError('Email wajib diisi');
-      return false;
+  const validate = () => {
+    const newErrors: Record<string, string> = {};
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    
+    if (!formData.name) newErrors.name = 'Nama wajib diisi';
+    if (!formData.email) {
+      newErrors.email = 'Email wajib diisi';
+    } else if (!emailRegex.test(formData.email)) {
+      newErrors.email = 'Format email tidak valid';
     }
-    if (!regex.test(value)) {
-      setEmailError('Format email tidak valid');
-      return false;
-    }
-    setEmailError('');
-    return true;
+    if (!formData.phone) newErrors.phone = 'Nomor WhatsApp wajib diisi';
+    if (!formData.subject) newErrors.subject = 'Subjek wajib diisi';
+    if (!formData.message) newErrors.message = 'Pesan wajib diisi';
+    
+    setErrors(newErrors);
+    return Object.keys(newErrors).length === 0;
   };
 
-  const handleEmailChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const value = e.target.value;
-    setEmail(value);
-    if (emailError) validateEmail(value);
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+    const { name, value } = e.target;
+    setFormData(prev => ({ ...prev, [name]: value }));
+    // Clear error when typing
+    if (errors[name]) {
+      setErrors(prev => {
+        const newErrors = { ...prev };
+        delete newErrors[name];
+        return newErrors;
+      });
+    }
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    if (!validateEmail(email)) {
+    if (!validate()) {
       return;
     }
 
     setIsSubmitting(true);
     
-    // Simulate API call
-    setTimeout(() => {
+    try {
+      // Use Formspree for handling form submissions
+      // Instructions: Create a form at https://formspree.io/ and put the Form ID in .env
+      const formspreeId = import.meta.env.VITE_FORMSPREE_ID || 'xpznayye'; // Fallback to a demo ID if not set
+      const response = await fetch(`https://formspree.io/f/${formspreeId}`, {
+        method: 'POST',
+        headers: {
+          'Accept': 'application/json',
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          ...formData,
+          _subject: `Pesan Baru dari ${formData.name}: ${formData.subject}`,
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error('Gagal mengirim pesan');
+      }
+
       setIsSubmitting(false);
       setIsSuccess(true);
+      setFormData({ name: '', email: '', phone: '', subject: '', message: '' });
       
       // Reset success after 5 seconds
-      setTimeout(() => setIsSuccess(false), 5000);
-    }, 1500);
+      setTimeout(() => setIsSuccess(false), 8000);
+    } catch (error) {
+      console.error('Error sending message:', error);
+      setIsSubmitting(false);
+      // You could add a toast here for error
+    }
   };
 
   return (
@@ -60,7 +100,7 @@ export default function ContactUs() {
                 Hubungi Kami
               </div>
               <h2 className="text-4xl font-extrabold text-slate-900 dark:text-white mb-6">Punya Pertanyaan Spesifik?</h2>
-              <p className="text-slate-600 dark:text-slate-400 text-lg leading-relaxed">
+              <p className="text-slate-600 dark:text-slate-300 text-lg leading-relaxed">
                 Tim Rumah Halal Indonesia siap membantu Bapak/Ibu memberikan konsultasi terbaik mengenai properti syariah. Silakan isi formulir di samping, kami akan merespons dalam waktu 1x24 jam.
               </p>
             </div>
@@ -104,11 +144,19 @@ export default function ContactUs() {
                        </label>
                        <input
                          required
+                         name="name"
                          type="text"
+                         value={formData.name}
+                         onChange={handleChange}
                          placeholder="Contoh: Ahmad"
-                         className="w-full bg-white dark:bg-slate-800 border-2 border-transparent focus:border-emerald-500 rounded-2xl py-4 px-6 text-sm font-medium transition-all outline-none text-slate-900 dark:text-white"
+                         className={cn(
+                           "w-full bg-white dark:bg-slate-800 border-2 rounded-2xl py-4 px-6 text-sm font-medium transition-all outline-none text-slate-900 dark:text-white",
+                           errors.name ? "border-rose-500 focus:border-rose-500" : "border-transparent focus:border-emerald-500"
+                         )}
                        />
+                       {errors.name && <p className="text-rose-500 text-[10px] font-bold px-2">{errors.name}</p>}
                      </div>
+
                      <div className="space-y-2">
                        <label className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-widest flex items-center gap-2">
                          <Mail size={14} className="text-emerald-500" />
@@ -116,31 +164,51 @@ export default function ContactUs() {
                        </label>
                        <input
                          required
+                         name="email"
                          type="email"
-                         value={email}
-                         onChange={handleEmailChange}
-                         onBlur={() => validateEmail(email)}
+                         value={formData.email}
+                         onChange={handleChange}
                          placeholder="ahmad@email.com"
                          className={cn(
                            "w-full bg-white dark:bg-slate-800 border-2 rounded-2xl py-4 px-6 text-sm font-medium transition-all outline-none text-slate-900 dark:text-white",
-                           emailError 
+                           errors.email 
                              ? "border-rose-500 focus:border-rose-500" 
                              : "border-transparent focus:border-emerald-500"
                          )}
                        />
                        <AnimatePresence>
-                         {emailError && (
+                         {errors.email && (
                            <motion.p 
                              initial={{ opacity: 0, height: 0 }}
                              animate={{ opacity: 1, height: 'auto' }}
                              exit={{ opacity: 0, height: 0 }}
                              className="text-rose-500 text-[10px] font-bold px-2"
                            >
-                             {emailError}
+                             {errors.email}
                            </motion.p>
                          )}
                        </AnimatePresence>
                      </div>
+
+                    <div className="space-y-2">
+                       <label className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-widest flex items-center gap-2">
+                         <Phone size={14} className="text-emerald-500" />
+                         Nomor WhatsApp
+                       </label>
+                       <input
+                         required
+                         name="phone"
+                         type="tel"
+                         value={formData.phone}
+                         onChange={handleChange}
+                         placeholder="0812..."
+                         className={cn(
+                           "w-full bg-white dark:bg-slate-800 border-2 rounded-2xl py-4 px-6 text-sm font-medium transition-all outline-none text-slate-900 dark:text-white",
+                           errors.phone ? "border-rose-500 focus:border-rose-500" : "border-transparent focus:border-emerald-500"
+                         )}
+                       />
+                       {errors.phone && <p className="text-rose-500 text-[10px] font-bold px-2">{errors.phone}</p>}
+                    </div>
 
                     <div className="space-y-2">
                        <label className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-widest flex items-center gap-2">
@@ -149,10 +217,17 @@ export default function ContactUs() {
                        </label>
                        <input
                          required
+                         name="subject"
                          type="text"
+                         value={formData.subject}
+                         onChange={handleChange}
                          placeholder="Pertanyaan unit, akad, dll."
-                         className="w-full bg-white dark:bg-slate-800 border-2 border-transparent focus:border-emerald-500 rounded-2xl py-4 px-6 text-sm font-medium transition-all outline-none text-slate-900 dark:text-white"
+                         className={cn(
+                           "w-full bg-white dark:bg-slate-800 border-2 rounded-2xl py-4 px-6 text-sm font-medium transition-all outline-none text-slate-900 dark:text-white",
+                           errors.subject ? "border-rose-500 focus:border-rose-500" : "border-transparent focus:border-emerald-500"
+                         )}
                        />
+                       {errors.subject && <p className="text-rose-500 text-[10px] font-bold px-2">{errors.subject}</p>}
                     </div>
 
                    <div className="space-y-2">
@@ -162,10 +237,17 @@ export default function ContactUs() {
                      </label>
                      <textarea
                        required
+                       name="message"
                        rows={4}
+                       value={formData.message}
+                       onChange={handleChange}
                        placeholder="Tuliskan detail pertanyaan Bapak/Ibu di sini..."
-                       className="w-full bg-white dark:bg-slate-800 border-2 border-transparent focus:border-emerald-500 rounded-2xl py-4 px-6 text-sm font-medium transition-all outline-none resize-none text-slate-900 dark:text-white"
+                       className={cn(
+                         "w-full bg-white dark:bg-slate-800 border-2 rounded-2xl py-4 px-6 text-sm font-medium transition-all outline-none resize-none text-slate-900 dark:text-white",
+                         errors.message ? "border-rose-500 focus:border-rose-500" : "border-transparent focus:border-emerald-500"
+                       )}
                      />
+                     {errors.message && <p className="text-rose-500 text-[10px] font-bold px-2">{errors.message}</p>}
                    </div>
 
                   <button
@@ -244,26 +326,26 @@ export default function ContactUs() {
               <h3 className="text-4xl md:text-5xl font-black text-white mb-6 font-display italic">
                 Nur Holis, <span className="text-emerald-500">M.E.I.</span>
               </h3>
-              <p className="text-slate-400 text-lg leading-relaxed mb-8 max-w-3xl">
+              <p className="text-slate-400 dark:text-slate-300 text-lg leading-relaxed mb-8 max-w-3xl">
                 Sebagai praktisi properti syariah selama lebih dari 10 tahun, saya berkomitmen membantu ummat memiliki hunian impian tanpa melalui jalur ribawi. Fokus kami bukan sekadar menjual rumah, melainkan membangun peradaban islami melalui kepemilikan aset yang berkah dan halal.
               </p>
 
               <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-10">
                 <div className="bg-white/5 border border-white/10 rounded-2xl p-4 text-center">
                   <p className="text-emerald-500 font-black text-2xl">10+</p>
-                  <p className="text-slate-500 text-[10px] font-bold uppercase tracking-wider">Tahun Pengalaman</p>
+                  <p className="text-slate-500 dark:text-slate-400 text-[10px] font-bold uppercase tracking-wider">Tahun Pengalaman</p>
                 </div>
                 <div className="bg-white/5 border border-white/10 rounded-2xl p-4 text-center">
                   <p className="text-emerald-500 font-black text-2xl">500+</p>
-                  <p className="text-slate-500 text-[10px] font-bold uppercase tracking-wider">Keluarga Terbantu</p>
+                  <p className="text-slate-500 dark:text-slate-400 text-[10px] font-bold uppercase tracking-wider">Keluarga Terbantu</p>
                 </div>
                 <div className="bg-white/5 border border-white/10 rounded-2xl p-4 text-center">
                   <p className="text-emerald-500 font-black text-2xl">12</p>
-                  <p className="text-slate-500 text-[10px] font-bold uppercase tracking-wider">Proyek Sukses</p>
+                  <p className="text-slate-500 dark:text-slate-400 text-[10px] font-bold uppercase tracking-wider">Proyek Sukses</p>
                 </div>
                 <div className="bg-white/5 border border-white/10 rounded-2xl p-4 text-center">
                   <p className="text-emerald-500 font-black text-2xl">100%</p>
-                  <p className="text-slate-500 text-[10px] font-bold uppercase tracking-wider">Murni Syariah</p>
+                  <p className="text-slate-500 dark:text-slate-400 text-[10px] font-bold uppercase tracking-wider">Murni Syariah</p>
                 </div>
               </div>
               

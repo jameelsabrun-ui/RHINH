@@ -9,11 +9,11 @@ import 'swiper/css';
 import 'swiper/css/navigation';
 import 'swiper/css/pagination';
 
-import { PROPERTIES } from '../data';
-import { formatCurrency, cn } from '../lib/utils';
+import { formatCurrency, cn, getOptimizedImageUrl } from '../lib/utils';
 import { calculateMurabahah } from '../lib/sharia-logic';
 import { Property, Review } from '../types';
 import { Link } from 'react-router-dom';
+import { propertyService } from '../services/propertyService';
 
 const MOCK_REVIEWS: Review[] = [
   { id: 'r1', propertyId: 'p1', userName: 'Ahmad Faisal', rating: 5, comment: 'Lingkungannya sangat islami dan tenang. Masjidnya bagus sekali.', date: '2026-04-20' },
@@ -73,8 +73,9 @@ const PropertySkeleton = () => (
 );
 
 export default function PropertyList() {
+  const [properties, setProperties] = React.useState<Property[]>([]);
   const [isLoading, setIsLoading] = React.useState(true);
-  const [filter, setFilter] = React.useState<'all' | 'available' | 'reserved' | 'sold' | 'favorites'>('all');
+  const [filter, setFilter] = React.useState<'all' | 'available' | 'reserved' | 'sold' | 'favorites' | 'rating'>('all');
   const [typeFilter, setTypeFilter] = React.useState<string>('all');
   const [locationFilter, setLocationFilter] = React.useState<string>('all');
   const [searchQuery, setSearchQuery] = React.useState('');
@@ -93,8 +94,8 @@ export default function PropertyList() {
   const [maxPrice, setMaxPrice] = React.useState<number>(2000000000); // 2 Billion default max
 
   const recommendations = React.useMemo(() => {
-    if (!selectedProperty) return [];
-    return PROPERTIES
+    if (!selectedProperty || properties.length === 0) return [];
+    return properties
       .filter(p => p.id !== selectedProperty.id)
       .sort((a, b) => {
         let scoreA = 0;
@@ -133,12 +134,15 @@ export default function PropertyList() {
     localStorage.setItem('rh_reviews', JSON.stringify(reviews));
   }, [reviews]);
 
-  // Simulate initial loading
+  // Fetch properties from Supabase
   React.useEffect(() => {
-    const timer = setTimeout(() => {
+    const fetchProperties = async () => {
+      setIsLoading(true);
+      const data = await propertyService.getProperties();
+      setProperties(data);
       setIsLoading(false);
-    }, 1500);
-    return () => clearTimeout(timer);
+    };
+    fetchProperties();
   }, []);
 
   const calculateEstimatedInstallment = (price: number) => {
@@ -239,14 +243,14 @@ export default function PropertyList() {
   }, [galleryProperty]);
 
   const propertyTypes = React.useMemo(() => {
-    const types = Array.from(new Set(PROPERTIES.map(p => p.type)));
+    const types = Array.from(new Set(properties.map(p => p.type)));
     return ['all', ...types];
-  }, []);
+  }, [properties]);
 
   const locations = React.useMemo(() => {
-    const uniqueLocations = Array.from(new Set(PROPERTIES.map(p => p.location)));
+    const uniqueLocations = Array.from(new Set(properties.map(p => p.location)));
     return ['all', ...uniqueLocations];
-  }, []);
+  }, [properties]);
 
   const resetFilters = () => {
     setFilter('all');
@@ -257,7 +261,7 @@ export default function PropertyList() {
     setMaxPrice(2000000000);
   };
 
-  const filteredProperties = PROPERTIES.filter(p => {
+  const filteredProperties = properties.filter(p => {
     const matchesFilter = filter === 'all' 
       ? true 
       : filter === 'favorites' 
@@ -299,7 +303,7 @@ export default function PropertyList() {
         <div className="flex flex-col md:flex-row md:items-end justify-between mb-12 gap-6">
           <div>
             <h2 className="text-3xl font-bold text-slate-900 dark:text-white mb-4">Unit Eksklusif RHI</h2>
-            <p className="text-slate-600 dark:text-slate-400 max-w-xl text-lg">
+            <p className="text-slate-600 dark:text-slate-300 max-w-xl text-lg">
               Pilihan hunian syariah terbaik di lokasi strategis yang memberikan ketenangan hati bagi keluarga Bapak/Ibu.
             </p>
           </div>
@@ -339,13 +343,15 @@ export default function PropertyList() {
                 <Filter size={18} />
                 <span className="text-sm font-bold uppercase tracking-wider">Status:</span>
               </div>
-              <div className="flex bg-slate-100 dark:bg-slate-800 p-1 rounded-2xl">
+              <div className="flex bg-slate-100 dark:bg-slate-800 p-1 rounded-2xl" role="tablist" aria-label="Filter Status Properti">
                 {filterOptions.map((opt) => (
                   <button
                     key={opt.value}
+                    role="tab"
+                    aria-selected={filter === opt.value}
                     onClick={() => setFilter(opt.value as any)}
                     className={cn(
-                      "px-4 md:px-6 py-2 rounded-xl text-sm font-bold transition-all",
+                      "px-4 md:px-6 py-2 rounded-xl text-sm font-bold transition-all focus:outline-none focus:ring-2 focus:ring-emerald-500",
                       filter === opt.value 
                         ? "bg-white dark:bg-slate-700 text-emerald-600 dark:text-emerald-400 shadow-sm" 
                         : "text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200"
@@ -359,13 +365,14 @@ export default function PropertyList() {
 
             <div className="flex items-center gap-4">
               <div className="flex items-center gap-2 text-slate-400 mr-2">
-                <MapPin size={18} />
+                <MapPin size={18} aria-hidden="true" />
                 <span className="text-sm font-bold uppercase tracking-wider">Lokasi:</span>
               </div>
               <select
                 value={locationFilter}
+                aria-label="Pilih Lokasi"
                 onChange={(e) => setLocationFilter(e.target.value)}
-                className="bg-slate-100 dark:bg-slate-800 border-2 border-transparent focus:border-emerald-500 rounded-2xl py-2 px-4 text-sm font-bold text-slate-700 dark:text-slate-300 outline-none transition-all cursor-pointer"
+                className="bg-slate-100 dark:bg-slate-800 border-2 border-transparent focus:border-emerald-500 rounded-2xl py-2 px-4 text-sm font-bold text-slate-700 dark:text-slate-300 outline-none transition-all cursor-pointer focus:ring-2 focus:ring-emerald-500"
               >
                 {locations.map((loc) => (
                   <option key={loc} value={loc} className="dark:bg-slate-900">
@@ -377,13 +384,14 @@ export default function PropertyList() {
 
             <div className="flex items-center gap-4">
               <div className="flex items-center gap-2 text-slate-400 mr-2">
-                <Home size={18} />
+                <Home size={18} aria-hidden="true" />
                 <span className="text-sm font-bold uppercase tracking-wider">Tipe:</span>
               </div>
               <select
                 value={typeFilter}
+                aria-label="Pilih Tipe Properti"
                 onChange={(e) => setTypeFilter(e.target.value)}
-                className="bg-slate-100 dark:bg-slate-800 border-2 border-transparent focus:border-emerald-500 rounded-2xl py-2 px-4 text-sm font-bold text-slate-700 dark:text-slate-300 outline-none transition-all cursor-pointer"
+                className="bg-slate-100 dark:bg-slate-800 border-2 border-transparent focus:border-emerald-500 rounded-2xl py-2 px-4 text-sm font-bold text-slate-700 dark:text-slate-300 outline-none transition-all cursor-pointer focus:ring-2 focus:ring-emerald-500"
               >
                 {propertyTypes.map((type) => (
                   <option key={type} value={type} className="dark:bg-slate-900">
@@ -410,7 +418,7 @@ export default function PropertyList() {
                     className="w-28 bg-slate-100 dark:bg-slate-800 border-2 border-transparent focus:border-emerald-500 rounded-xl py-2 pl-10 pr-3 text-xs font-bold text-slate-700 dark:text-slate-300 outline-none transition-all"
                   />
                 </div>
-                <span className="text-slate-300 dark:text-slate-600">—</span>
+                <span className="text-slate-300 dark:text-slate-500">—</span>
                 <div className="relative">
                   <span className="absolute left-3 top-1/2 -translate-y-1/2 text-[10px] font-bold text-slate-400">Max</span>
                   <input
@@ -456,246 +464,260 @@ export default function PropertyList() {
           </motion.a>
         </div>
 
-        <motion.div 
-          variants={{
-            hidden: { opacity: 0 },
-            show: {
-              opacity: 1,
-              transition: {
-                staggerChildren: 0.1,
-                delayChildren: 0.1
-              }
-            }
-          }}
-          initial="hidden"
-          whileInView="show"
-          viewport={{ once: true, margin: "-50px" }}
-          className="grid md:grid-cols-2 lg:grid-cols-3 gap-8"
-        >
-          <AnimatePresence mode="popLayout" initial={false}>
+        <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-8 min-h-[400px]">
+          <AnimatePresence mode="wait">
             {isLoading ? (
-              [1, 2, 3, 4, 5, 6].map((i) => (
-                <motion.div
-                  key={`skeleton-${i}`}
-                  variants={{
-                    hidden: { opacity: 0, y: 20 },
-                    show: { opacity: 1, y: 0 }
-                  }}
-                  exit={{ opacity: 0, scale: 0.9 }}
-                >
-                  <PropertySkeleton />
-                </motion.div>
-              ))
-            ) : sortedProperties.map((property) => {
-              const stats = getPropertyStats(property.id);
-              return (
-                <motion.div 
-                  key={property.id} 
-                  layout
-                  variants={{
-                    hidden: { opacity: 0, y: 30 },
-                    show: { opacity: 1, y: 0 }
-                  }}
-                  exit={{ opacity: 0, scale: 0.95 }}
-                  transition={{ duration: 0.6, ease: [0.21, 0.47, 0.32, 0.98] }}
-                  className="group bg-white dark:bg-slate-900 rounded-3xl overflow-hidden border border-slate-100 dark:border-slate-800 shadow-sm hover:shadow-xl transition-all flex flex-col"
-                >
-                <div className="relative h-64 overflow-hidden">
-                  <img
-                    src={property.image}
-                    alt={property.name}
-                    className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
-                  />
-                  
-                  {/* Favorite Button */}
-                  <button
-                    onClick={(e) => toggleFavorite(property.id, e)}
-                    className={cn(
-                      "absolute top-4 left-4 z-10 w-10 h-10 backdrop-blur-md rounded-full flex items-center justify-center transition-all shadow-md group/heart",
-                      favorites.includes(property.id) 
-                        ? "bg-rose-50 dark:bg-rose-950/30 text-rose-500" 
-                        : "bg-white/80 dark:bg-slate-900/80 text-slate-900 dark:text-white hover:text-rose-500"
-                    )}
-                    title={favorites.includes(property.id) ? "Hapus dari Favorit" : "Tambah ke Favorit"}
-                  >
-                    <Heart 
-                      size={20} 
-                      className={cn(
-                        "transition-all duration-300",
-                        favorites.includes(property.id) ? "fill-rose-500 scale-110" : "group-hover/heart:scale-110"
-                      )} 
-                    />
-                  </button>
-  
-                  <div className="absolute top-4 right-4 z-10 flex flex-col items-end gap-2">
-                    <span className={cn(
-                      "px-4 py-1.5 rounded-full text-[10px] font-black uppercase tracking-wider shadow-lg flex items-center gap-1.5 backdrop-blur-md",
-                      property.status === 'available' && "bg-emerald-500/90 text-white",
-                      property.status === 'reserved' && "bg-amber-500/90 text-white",
-                      property.status === 'sold' && "bg-rose-500/90 text-white"
-                    )}>
-                      {property.status === 'available' && <CheckCircle2 size={12} />}
-                      {property.status === 'reserved' && <Info size={12} />}
-                      {property.status === 'sold' && <X size={12} />}
-                      {property.status === 'available' ? 'Tersedia' : property.status === 'reserved' ? 'Reserved' : 'Terjual'}
-                    </span>
-                    {stats.count > 0 && (
-                      <motion.div 
-                        initial={{ opacity: 0, x: 10 }}
-                        animate={{ opacity: 1, x: 0 }}
-                        className="bg-white/95 dark:bg-slate-900/95 backdrop-blur-md px-3 py-1.5 rounded-full flex items-center gap-2 shadow-lg border border-slate-100 dark:border-slate-800"
-                      >
-                        <Star size={12} className="fill-amber-400 text-amber-400" />
-                        <span className="text-[10px] font-black text-slate-800 dark:text-slate-100">{stats.avg}</span>
-                        <div className="w-px h-3 bg-slate-200 dark:bg-slate-700 mx-0.5" />
-                        <span className="text-[9px] text-slate-400 dark:text-slate-500 font-bold uppercase tracking-tighter">{stats.count} Ulasan</span>
-                      </motion.div>
-                    )}
-                  </div>
-                  <div className="absolute bottom-4 left-4 flex gap-2">
-                     <div className="bg-white/90 dark:bg-slate-900/90 backdrop-blur px-3 py-1 rounded-lg text-xs font-bold text-slate-900 dark:text-white flex items-center gap-1 shadow-sm">
-                       <Home size={14} className="text-emerald-600 dark:text-emerald-400" />
-                       {property.type}
-                     </div>
-                  </div>
-                </div>
-  
-                <div className="p-6 flex-grow flex flex-col">
-                  <div className="flex items-center gap-1 text-slate-500 dark:text-slate-400 text-xs mb-2">
-                    <MapPin size={14} />
-                    {property.location}
-                  </div>
-                  <div className="mb-3 flex items-center justify-between">
-                    <h3 className="text-xl font-bold text-slate-900 dark:text-white">{property.name}</h3>
-                    {stats.count > 0 && (
-                      <div className="flex items-center gap-1 text-amber-500 bg-amber-50 dark:bg-amber-900/20 px-2 py-0.5 rounded-lg border border-amber-100 dark:border-amber-900/30">
-                        <Star size={12} className="fill-amber-500" />
-                        <span className="text-xs font-bold">{stats.avg}</span>
-                      </div>
-                    )}
-                  </div>
-                  <p className="text-slate-600 dark:text-slate-400 text-sm line-clamp-2 mb-4">
-                    {property.description}
-                  </p>
-
-                {/* Construction Progress */}
-                <div className="mb-4">
-                  <div className="flex justify-between items-center mb-1">
-                    <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Progres Konstruksi</span>
-                    <span className="text-[10px] font-bold text-emerald-600">{property.progress}%</span>
-                  </div>
-                  <div className="w-full h-1.5 bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden">
+              <motion.div
+                key="loading-skeletons"
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                transition={{ duration: 0.3 }}
+                className="col-span-full grid md:grid-cols-2 lg:grid-cols-3 gap-8"
+              >
+                {[1, 2, 3, 4, 5, 6].map((i) => (
+                  <PropertySkeleton key={`skeleton-${i}`} />
+                ))}
+              </motion.div>
+            ) : sortedProperties.length > 0 ? (
+              <motion.div
+                key="property-results"
+                initial="hidden"
+                animate="show"
+                exit={{ opacity: 0 }}
+                variants={{
+                  hidden: { opacity: 0 },
+                  show: {
+                    opacity: 1,
+                    transition: {
+                      staggerChildren: 0.08
+                    }
+                  }
+                }}
+                className="col-span-full grid md:grid-cols-2 lg:grid-cols-3 gap-8"
+              >
+                {sortedProperties.map((property) => {
+                  const stats = getPropertyStats(property.id);
+                  return (
                     <motion.div 
-                      initial={{ width: 0 }}
-                      whileInView={{ width: `${property.progress}%` }}
-                      viewport={{ once: true }}
-                      transition={{ duration: 1, ease: "easeOut" }}
-                      className="h-full bg-emerald-500 rounded-full"
-                    />
-                  </div>
-                </div>
-
-                {/* Features Section */}
-                <div className="flex flex-wrap gap-2 mb-6">
-                  {property.features.map((feature, i) => (
-                    <div key={i} className="flex items-center gap-1.5 bg-slate-50 dark:bg-slate-800/50 border border-slate-100 dark:border-slate-800 px-2.5 py-1 rounded-lg">
-                      <FeatureIcon feature={feature} />
-                      <span className="text-[10px] font-bold text-slate-600 dark:text-slate-400 uppercase tracking-wide">{feature}</span>
+                      key={property.id} 
+                      layout
+                      variants={{
+                        hidden: { opacity: 0, y: 20, scale: 0.98 },
+                        show: { opacity: 1, y: 0, scale: 1 }
+                      }}
+                      exit={{ opacity: 0, scale: 0.95 }}
+                      transition={{ duration: 0.5, ease: [0.21, 0.47, 0.32, 0.98] }}
+                      className="group bg-white dark:bg-slate-900 rounded-3xl overflow-hidden border border-slate-100 dark:border-slate-800 shadow-sm hover:shadow-xl transition-all flex flex-col"
+                    >
+                      <div className="relative h-64 overflow-hidden">
+                        <img
+                          src={getOptimizedImageUrl(property.image, 600)}
+                          alt={property.name}
+                          className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+                        />
+                        
+                        {/* Favorite Button */}
+                        <button
+                          onClick={(e) => toggleFavorite(property.id, e)}
+                          className={cn(
+                            "absolute top-4 left-4 z-10 w-10 h-10 backdrop-blur-md rounded-full flex items-center justify-center transition-all shadow-md group/heart",
+                            favorites.includes(property.id) 
+                              ? "bg-rose-50 dark:bg-rose-950/30 text-rose-500" 
+                              : "bg-white/80 dark:bg-slate-900/80 text-slate-900 dark:text-white hover:text-rose-500"
+                          )}
+                          title={favorites.includes(property.id) ? "Hapus dari Favorit" : "Tambah ke Favorit"}
+                        >
+                          <Heart 
+                            size={20} 
+                            className={cn(
+                              "transition-all duration-300",
+                              favorites.includes(property.id) ? "fill-rose-500 scale-110" : "group-hover/heart:scale-110"
+                            )} 
+                          />
+                        </button>
+        
+                        <div className="absolute top-4 right-4 z-10 flex flex-col items-end gap-2">
+                          <span className={cn(
+                            "px-4 py-1.5 rounded-full text-[10px] font-black uppercase tracking-wider shadow-lg flex items-center gap-1.5 backdrop-blur-md",
+                            property.status === 'available' && "bg-emerald-500/90 text-white",
+                            property.status === 'reserved' && "bg-amber-500/90 text-white",
+                            property.status === 'sold' && "bg-rose-500/90 text-white"
+                          )}>
+                            {property.status === 'available' && <CheckCircle2 size={12} />}
+                            {property.status === 'reserved' && <Info size={12} />}
+                            {property.status === 'sold' && <X size={12} />}
+                            {property.status === 'available' ? 'Tersedia' : property.status === 'reserved' ? 'Reserved' : 'Terjual'}
+                          </span>
+                          {stats.count > 0 && (
+                            <motion.div 
+                              initial={{ opacity: 0, x: 10 }}
+                              animate={{ opacity: 1, x: 0 }}
+                              className="bg-white/95 dark:bg-slate-900/95 backdrop-blur-md px-3 py-1.5 rounded-full flex items-center gap-2 shadow-lg border border-slate-100 dark:border-slate-800"
+                            >
+                              <Star size={12} className="fill-amber-400 text-amber-400" />
+                              <span className="text-[10px] font-black text-slate-800 dark:text-slate-100">{stats.avg}</span>
+                              <div className="w-px h-3 bg-slate-200 dark:bg-slate-700 mx-0.5" />
+                              <span className="text-[9px] text-slate-400 dark:text-slate-500 font-bold uppercase tracking-tighter">{stats.count} Ulasan</span>
+                            </motion.div>
+                          )}
+                        </div>
+                        <div className="absolute bottom-4 left-4 flex gap-2">
+                           <div className="bg-white/90 dark:bg-slate-900/90 backdrop-blur px-3 py-1 rounded-lg text-xs font-bold text-slate-900 dark:text-white flex items-center gap-1 shadow-sm">
+                             <Home size={14} className="text-emerald-600 dark:text-emerald-400" />
+                             {property.type}
+                           </div>
+                        </div>
+                      </div>
+        
+                      <div className="p-6 flex-grow flex flex-col">
+                        <div className="flex items-center gap-1 text-slate-500 dark:text-slate-400 text-xs mb-2">
+                          <MapPin size={14} />
+                          {property.location}
+                        </div>
+                        <div className="mb-3 flex items-center justify-between">
+                          <h3 className="text-xl font-bold text-slate-900 dark:text-white">{property.name}</h3>
+                          {stats.count > 0 && (
+                            <div className="flex items-center gap-1 text-amber-500 bg-amber-50 dark:bg-amber-900/20 px-2 py-0.5 rounded-lg border border-amber-100 dark:border-amber-900/30">
+                              <Star size={12} className="fill-amber-500" />
+                              <span className="text-xs font-bold">{stats.avg}</span>
+                            </div>
+                          )}
+                        </div>
+                        <p className="text-slate-600 dark:text-slate-300 text-sm line-clamp-2 mb-4">
+                          {property.description}
+                        </p>
+      
+                      {/* Construction Progress */}
+                      <div className="mb-4">
+                        <div className="flex justify-between items-center mb-1">
+                          <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Progres Konstruksi</span>
+                          <span className="text-[10px] font-bold text-emerald-600">{property.progress}%</span>
+                        </div>
+                        <div className="w-full h-1.5 bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden">
+                          <motion.div 
+                            initial={{ width: 0 }}
+                            whileInView={{ width: `${property.progress}%` }}
+                            viewport={{ once: true }}
+                            transition={{ duration: 1, ease: "easeOut" }}
+                            className="h-full bg-emerald-500 rounded-full"
+                          />
+                        </div>
+                      </div>
+      
+                      {/* Features Section */}
+                      <div className="flex flex-wrap gap-2 mb-6">
+                        {property.features.map((feature, i) => (
+                          <div key={i} className="flex items-center gap-1.5 bg-slate-50 dark:bg-slate-800/50 border border-slate-100 dark:border-slate-800 px-2.5 py-1 rounded-lg">
+                            <FeatureIcon feature={feature} />
+                            <span className="text-[10px] font-bold text-slate-600 dark:text-slate-400 uppercase tracking-wide">{feature}</span>
+                          </div>
+                        ))}
+                      </div>
+      
+                        <div className="mt-4 flex flex-col gap-3">
+                          <a 
+                            href={`https://wa.me/6281234567890?text=${encodeURIComponent(`Assalamu'alaikum Bapak Nur Holis, saya tertarik dengan unit *${property.name}* di ${property.location} (Tipe ${property.type}). Mohon info detailnya.`)}`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="w-full bg-emerald-600 text-white py-3 rounded-2xl font-bold flex items-center justify-center gap-2 hover:bg-emerald-700 transition-all shadow-md shadow-emerald-600/10"
+                            onClick={(e) => e.stopPropagation()}
+                          >
+                            <MessageCircle size={18} />
+                            Hubungi Agen via WhatsApp
+                          </a>
+                        </div>
+      
+                      <div className="mt-auto flex items-center justify-between pt-6 border-t border-slate-100 dark:border-slate-800">
+                        <div className="flex flex-col">
+                          <p className="text-[10px] text-slate-400 dark:text-slate-500 font-bold uppercase tracking-wider mb-1">Mulai Dari</p>
+                          <p className="text-lg font-bold text-emerald-600 dark:text-emerald-500 leading-none mb-1.5">{formatCurrency(property.price)}</p>
+                          <Link 
+                            to={window.location.pathname === '/' ? `/?price=${property.price}#calculator` : `/calculator?price=${property.price}`}
+                            title="Hitung simulasi cicilan Bapak/Ibu sendiri di Kalkulator Syariah"
+                            className="flex items-center gap-1.5 text-[10px] bg-emerald-50 dark:bg-emerald-900/40 text-emerald-700 dark:text-emerald-400 px-2 py-1 rounded-lg w-fit font-bold shadow-sm hover:bg-emerald-100 dark:hover:bg-emerald-800 transition-colors group/calc"
+                            onClick={(e) => {
+                              if (window.location.pathname === '/') {
+                                // If on home, it will update URL and we want to scroll
+                                // The hash in 'to' might not trigger smooth scroll automatically with Link
+                                setTimeout(() => {
+                                  const el = document.getElementById('calculator');
+                                  if (el) el.scrollIntoView({ behavior: 'smooth' });
+                                }, 100);
+                              }
+                            }}
+                          >
+                            <Landmark size={10} className="group-hover/calc:scale-110 transition-transform" />
+                            <span className="opacity-80">Cicilan:</span>
+                            {formatCurrency(calculateEstimatedInstallment(property.price))}/bln
+                            <ArrowRight size={8} className="ml-0.5 group-hover/calc:translate-x-0.5 transition-transform" />
+                          </Link>
+                        </div>
+                        <div className="flex gap-2">
+                          <a 
+                            href={`https://wa.me/6281234567890?text=${encodeURIComponent(`Assalamu'alaikum Bapak Nur Holis, saya tertarik dengan unit *${property.name}* di ${property.location} (Tipe ${property.type}). Mohon info detailnya.`)}`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="bg-emerald-50 dark:bg-emerald-900/30 text-emerald-600 dark:text-emerald-400 p-2.5 rounded-xl hover:bg-emerald-100 dark:hover:bg-emerald-900/50 transition-all"
+                            title="Hubungi Agen (WhatsApp)"
+                            onClick={(e) => e.stopPropagation()}
+                          >
+                            <MessageCircle size={18} />
+                          </a>
+                          <button 
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleShare(property);
+                            }}
+                            className="bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 p-2.5 rounded-xl hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors relative"
+                            title="Bagikan Properti"
+                          >
+                            <Share2 size={18} />
+                          </button>
+                          <button 
+                            onClick={() => {
+                              setGalleryProperty(property);
+                              setActiveImageIndex(0);
+                            }}
+                            className="bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 p-2.5 rounded-xl hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors"
+                            title="Galeri Foto"
+                          >
+                            <ImageIcon size={18} />
+                          </button>
+                          <button 
+                            onClick={() => setSelectedProperty(property)}
+                            className="bg-slate-900 text-white px-5 py-2.5 rounded-xl text-sm font-bold hover:bg-emerald-600 transition-colors"
+                          >
+                            Lihat Detail
+                          </button>
+                        </div>
+                      </div>
                     </div>
-                  ))}
+                    </motion.div>
+                  );
+                })}
+              </motion.div>
+            ) : (
+              <motion.div 
+                key="empty-state"
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                className="col-span-full py-20 text-center bg-slate-50 dark:bg-slate-900/50 rounded-3xl border-2 border-dashed border-slate-200 dark:border-slate-800"
+              >
+                <div className="flex flex-col items-center gap-4">
+                  <p className="text-slate-400 dark:text-slate-500 font-bold">Tidak ada unit dengan kriteria ini saat ini.</p>
+                  <button 
+                    onClick={resetFilters}
+                    className="bg-emerald-600 text-white px-6 py-2 rounded-xl font-bold text-sm shadow-lg shadow-emerald-600/20"
+                  >
+                    Lihat Semua Unit
+                  </button>
                 </div>
-
-                  <div className="mt-4 flex flex-col gap-3">
-                    <a 
-                      href={`https://wa.me/6281234567890?text=${encodeURIComponent(`Assalamu'alaikum Bapak Nur Holis, saya tertarik dengan unit *${property.name}* di ${property.location} (Tipe ${property.type}). Mohon info detailnya.`)}`}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="w-full bg-emerald-600 text-white py-3 rounded-2xl font-bold flex items-center justify-center gap-2 hover:bg-emerald-700 transition-all shadow-md shadow-emerald-600/10"
-                      onClick={(e) => e.stopPropagation()}
-                    >
-                      <MessageCircle size={18} />
-                      Hubungi Agen via WhatsApp
-                    </a>
-                  </div>
-
-                <div className="mt-auto flex items-center justify-between pt-6 border-t border-slate-100 dark:border-slate-800">
-                  <div className="flex flex-col">
-                    <p className="text-[10px] text-slate-400 dark:text-slate-500 font-bold uppercase tracking-wider mb-1">Mulai Dari</p>
-                    <p className="text-lg font-bold text-emerald-600 dark:text-emerald-500 leading-none mb-1.5">{formatCurrency(property.price)}</p>
-                    <Link 
-                      to="/calculator"
-                      title="Hitung simulasi cicilan Bapak/Ibu sendiri di Kalkulator Syariah"
-                      className="flex items-center gap-1.5 text-[10px] bg-emerald-50 dark:bg-emerald-900/40 text-emerald-700 dark:text-emerald-400 px-2 py-1 rounded-lg w-fit font-bold shadow-sm hover:bg-emerald-100 dark:hover:bg-emerald-800 transition-colors group/calc"
-                      onClick={(e) => e.stopPropagation()}
-                    >
-                      <Landmark size={10} className="group-hover/calc:scale-110 transition-transform" />
-                      <span className="opacity-80">Cicilan:</span>
-                      {formatCurrency(calculateEstimatedInstallment(property.price))}/bln
-                      <ArrowRight size={8} className="ml-0.5 group-hover/calc:translate-x-0.5 transition-transform" />
-                    </Link>
-                  </div>
-                  <div className="flex gap-2">
-                    <a 
-                      href={`https://wa.me/6281234567890?text=${encodeURIComponent(`Assalamu'alaikum Bapak Nur Holis, saya tertarik dengan unit *${property.name}* di ${property.location} (Tipe ${property.type}). Mohon info detailnya.`)}`}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="bg-emerald-50 dark:bg-emerald-900/30 text-emerald-600 dark:text-emerald-400 p-2.5 rounded-xl hover:bg-emerald-100 dark:hover:bg-emerald-900/50 transition-all"
-                      title="Hubungi Agen (WhatsApp)"
-                      onClick={(e) => e.stopPropagation()}
-                    >
-                      <MessageCircle size={18} />
-                    </a>
-                    <button 
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        handleShare(property);
-                      }}
-                      className="bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 p-2.5 rounded-xl hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors relative"
-                      title="Bagikan Properti"
-                    >
-                      <Share2 size={18} />
-                    </button>
-                    <button 
-                      onClick={() => {
-                        setGalleryProperty(property);
-                        setActiveImageIndex(0);
-                      }}
-                      className="bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 p-2.5 rounded-xl hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors"
-                      title="Galeri Foto"
-                    >
-                      <ImageIcon size={18} />
-                    </button>
-                    <button 
-                      onClick={() => setSelectedProperty(property)}
-                      className="bg-slate-900 text-white px-5 py-2.5 rounded-xl text-sm font-bold hover:bg-emerald-600 transition-colors"
-                    >
-                      Lihat Detail
-                    </button>
-                  </div>
-                </div>
-              </div>
-                </motion.div>
-              );
-            })}
+              </motion.div>
+            )}
           </AnimatePresence>
-          {filteredProperties.length === 0 && (
-            <motion.div 
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              className="col-span-full py-20 text-center bg-slate-50 dark:bg-slate-900/50 rounded-3xl border-2 border-dashed border-slate-200 dark:border-slate-800"
-            >
-              <div className="flex flex-col items-center gap-4">
-                <p className="text-slate-400 dark:text-slate-500 font-bold">Tidak ada unit dengan kriteria ini saat ini.</p>
-                <button 
-                  onClick={resetFilters}
-                  className="bg-emerald-600 text-white px-6 py-2 rounded-xl font-bold text-sm shadow-lg shadow-emerald-600/20"
-                >
-                  Lihat Semua Unit
-                </button>
-              </div>
-            </motion.div>
-          )}
-        </motion.div>
+        </div>
 
         {filteredProperties.length > 0 && (
           <div className="mt-16 text-center">
@@ -791,7 +813,7 @@ export default function PropertyList() {
                   {selectedProperty.images.map((img, index) => (
                     <SwiperSlide key={index}>
                       <img
-                        src={img}
+                        src={getOptimizedImageUrl(img, 1000)}
                         alt={`${selectedProperty.name} view ${index + 1}`}
                         className="w-full h-full object-cover"
                       />
@@ -861,7 +883,7 @@ export default function PropertyList() {
                 </div>                 <div className="space-y-6">
                    <div>
                     <h4 className="text-sm font-bold text-slate-900 dark:text-white mb-2 uppercase tracking-wide">Deskripsi Unit</h4>
-                    <p className="text-slate-600 dark:text-slate-400 text-sm leading-relaxed">
+                    <p className="text-slate-600 dark:text-slate-300 text-sm leading-relaxed">
                       {selectedProperty.description}
                     </p>
                   </div>
@@ -902,9 +924,18 @@ export default function PropertyList() {
                         <p className="text-xs text-slate-400 dark:text-slate-500 font-bold mb-1 uppercase">Harga Mulai Dari</p>
                         <p className="text-3xl font-black text-emerald-600 dark:text-emerald-500 leading-none mb-2">{formatCurrency(selectedProperty.price)}</p>
                         <Link 
-                          to="/calculator"
+                          to={window.location.pathname === '/' ? `/?price=${selectedProperty.price}#calculator` : `/calculator?price=${selectedProperty.price}`}
                           title="Klik untuk menghitung simulasi cicilan Bapak/Ibu sendiri"
                           className="flex flex-col gap-1 text-xs bg-emerald-50 dark:bg-emerald-900/20 text-emerald-700 dark:text-emerald-400 px-4 py-3 rounded-2xl w-fit font-bold border border-emerald-100 dark:border-emerald-900/30 hover:bg-emerald-100 dark:hover:bg-emerald-800 transition-all group/modal-calc shadow-sm hover:shadow-md"
+                          onClick={(e) => {
+                            if (window.location.pathname === '/') {
+                              setSelectedProperty(null);
+                              setTimeout(() => {
+                                const el = document.getElementById('calculator');
+                                if (el) el.scrollIntoView({ behavior: 'smooth' });
+                              }, 100);
+                            }
+                          }}
                         >
                           <div className="flex items-center gap-2">
                              <Landmark size={16} className="group-hover/modal-calc:scale-110 transition-transform" />
@@ -1145,7 +1176,7 @@ export default function PropertyList() {
                                 />
                               ))}
                             </div>
-                            <p className="text-slate-600 dark:text-slate-400 text-xs leading-relaxed italic">"{review.comment}"</p>
+                            <p className="text-slate-600 dark:text-slate-300 text-xs leading-relaxed italic">"{review.comment}"</p>
                           </div>
                         ))
                       )}

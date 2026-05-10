@@ -54,3 +54,67 @@ export function calculateMMq(
     tenorMonths,
   };
 }
+
+/**
+ * Kalkulasi Pelunasan Dipercepat
+ * Dalam syariah, pelunasan dipercepat biasanya diberikan 'Muqasah' (potongan)
+ * Potongan ini biasanya berasal dari margin yang belum berjalan.
+ */
+export function calculateEarlyPayoff(
+  originalResult: CalculationResult,
+  monthsPaid: number,
+  financingAmount: number,
+  akad: "Murabahah" | "MMq"
+): {
+  remainingDebt: number;
+  estimatedMuqasah: number;
+  totalToPay: number;
+} {
+  const monthsRemaining = Math.max(0, originalResult.tenorMonths - monthsPaid);
+  
+  if (monthsRemaining <= 0) {
+    return { remainingDebt: 0, estimatedMuqasah: 0, totalToPay: 0 };
+  }
+
+  if (akad === "Murabahah") {
+    // Murabahah: Total Hutang = Cicilan * Sisa Bulan
+    const remainingDebt = originalResult.monthlyInstallment * monthsRemaining;
+    const marginPerMonth = originalResult.totalMargin / originalResult.tenorMonths;
+    const estimatedMuqasah = marginPerMonth * monthsRemaining;
+    
+    return {
+      remainingDebt,
+      estimatedMuqasah,
+      totalToPay: Math.round(remainingDebt - estimatedMuqasah)
+    };
+  } else {
+    // MMq: Estimasi sisa pokok menggunakan bunga efektif bulanan
+    // Suku bunga efektif tahunan diestimasikan dari total margin yang dibayar selama tenor
+    const annualRate = (originalResult.totalMargin / financingAmount) / (originalResult.tenorMonths / 12);
+    const monthlyRate = annualRate / 12;
+    
+    if (monthlyRate === 0 || isNaN(monthlyRate)) {
+      const remainingDebt = originalResult.monthlyInstallment * monthsRemaining;
+      return {
+        remainingDebt,
+        estimatedMuqasah: 0,
+        totalToPay: remainingDebt
+      };
+    }
+
+    // Sisa pokok anuitas
+    const remainingPrincipal = Math.ceil(
+      originalResult.monthlyInstallment * 
+      (1 - Math.pow(1 + monthlyRate, -monthsRemaining)) / 
+      monthlyRate
+    );
+
+    const totalContractualRemaining = originalResult.monthlyInstallment * monthsRemaining;
+
+    return {
+      remainingDebt: totalContractualRemaining,
+      estimatedMuqasah: Math.max(0, Math.round(totalContractualRemaining - remainingPrincipal)),
+      totalToPay: remainingPrincipal
+    };
+  }
+}
